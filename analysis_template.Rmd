@@ -1,92 +1,277 @@
 ---
-title: "Insert your team name here"
+title: "Technical DifficulKEYS vs the Replicathon"
 output: html_document
 date: Replicathon 2020
-author: Team members names
+author: Andrea Edwards, Otto Kailing, and Ana Kilgore
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Instructions:
+## Introduction:
 
-In this R Markdown document, you and your team will create a fully reproducible analysis with the goal of assessing and interpreting the replicability of two pharmacogenomic experiments. This document should contain all of the text and code of your analyses, which will allow others to run, interpret, and reuse your work.
-
-The questions below will help guide you in your analyses and interpretation of results. You don't need to answer every question, but for the problems you do complete, make sure that you completely justify your conclusions by explaining your reasoning and including numerical summaries and data visualizations wherever possible. There are four tutorials (also R Markdown documents) that will help you learn new tools to tackle these problems, and the questions are divided into four sections corresponding to the tutorials (though many overlap with more than one tutorial). If questions arise during your analyses that do not fit into these problems, feel free to include those as well. 
-
-For each answer, include text by simply typing below the question. Include code in code blocks (include three back ticks at the start and end of each code block):
-
-```{r}
-#Your code goes here
-```
-
-You may find it helpful to use the version control and code sharing system called GitHub to work together with your team so that all of you can edit the same document and keep track of its changes. Here is a [setup guide](https://github.com/datasciencelabs/2016/blob/master/lectures/git-and-github/setting-up-git.Rmd) and [brief introduction to Git and GitHub](https://github.com/datasciencelabs/2016/blob/master/lectures/git-and-github/version-control.Rmd) from another course. The mentors will be able to help if you run into problems. 
-
-## Questions:
+In this R Markdown document, we have documented our analysis (or attempted analysis) of two pharmacogenomic experiments and interpretation of their replicability. Our thought process was guided heavily by the provided materials, including this template and all the tutorials.
 
 ### Exploratory analysis of pharmacogenomic data
 
-1. How many cell-lines are contained in the data?
+#### a. Basic attributes of the raw data
 
-2. What drug concentrations were used in each study?
+We began by exploring the raw Pharmaco Data file. In this dataset, there are 288 cell-lines and 15 drugs. The two studies, CCLE and GDSC, have 8 and 32 unique drug concentrations each respectively.This dataset has 6 different attributes; cell-line, drug type, dose ID, concentration, viability, and study.
 
-3. Histograms, appart from telling us how the data is
-distributed, can also make evident potential
-problems with the data. Plot a histogram
-of drug viabilities. Does it look as one would
-expect from the description of the data?
+```{r}
+library(tidyverse)
 
-4. How many viability data points are within the
-expected range according to the definition of viability (e.g. above 0 
-and below 100)? Try to come up with explanations about
-the values that are out of range. Are these due to technical
-issues? Biology?
+## import data
+pharmacoData <- readRDS(file.path("data", "rawPharmacoData.rds"))
 
-5. Read the csv file containing the summarized data. What kinds
-of variables are in the data? What does each column represent?
 
-6. Plot histograms of the viability scores at different levels of drug
-doses. Are stronger drug concentrations consistent with lower viability scores?
+```
+
+```{r}
+head(pharmacoData)
+str(pharmacoData)
+```
+
+#### b. Viability Distribution
+
+We used a histogram to view viability distribution, and compare it with the data descriptions we obtained earlier. Based on the values visible in the first lines of the dataset, the distribution shown by the histogram seems to match that of known viability values. 
+
+```{r}
+
+# creating histograms for the separate studies
+pharmacoData %>%
+  ggplot(aes(x = viability)) +
+  geom_histogram(fill = "gray", color = "black") +
+  facet_wrap(~ study) +
+  ggtitle("Distributions of viability by study") 
+
+range(pharmacoData$viability)
+sum(pharmacoData$viability)
+sum(pharmacoData$viability < 0)
+sum(pharmacoData$viability > 100)
+```
+
+However, although the distribution fits, some of the outlying points do not make sense considering the attribute type. The term "viability" refers to the percentage of cells that survive upon drug exposure, so in theory, all viability points should fall within the expected range of 0-100.
+
+According to the above calculations, data points have a range of -20.0 to 319.4919. From a total of 3,826,909 points, only 23 points fall under 0, while 15778 points are above 100. Overall, the outlying points make up only 0.4% of data, and are not statistically significant. This is most likely due to a technical issue.
+
+#### c. Comparing Variation Distributions
+
+
+```{r}
+pharmacoData %>%
+    ggplot(aes(x = viability, group = study, fill = study, color = study)) +
+    geom_density(alpha = 1/4) +
+    xlim(0, 170) +
+    ggtitle("Distributions of viability scores by study")
+```
+
+The graph shown above shows a comparison of viability distributions across the two studies. Overlaying the two distributions, there do not seem to be any major variations in viability. 
+
+```{r}
+pharmacoData %>%
+    ggplot(aes(x = viability, group = doseID, fill = doseID, color = doseID)) +
+    geom_density(alpha = 1/4) +
+    xlim(0, 170) +
+    ggtitle("Distributions of viability scores by dose ID")
+
+```
+
+This distribution shows viability distributions across dosages 1-9. These distributions are not as consistent, at higher dosages viability becomes less consistent with lower doses. The high dose curves have higher viability at lower levels, and lower viability at higher levels.
+
+#### Summarized Data Exploration
+
+We also explored the Summarized Data Exploration data. The summarized Data file contains 6 columns representing the variables cell Line, drug, and IC50 and AUC for the CCLE study as well as for the GDSC study.
+
+```{r}
+summarizedData <- readRDS(file.path("data", "summarizedPharmacoData.rds"))
+str(summarizedData)
+```
 
 ### Using Correlation Measures to Assess Replicability of Drug Response Studies
 
-1. Create a scatterplot for each drug comparing the AUC in GDSC and CCLE for all cell lines (hint: code from Tutorial 1b may help).
+#### Comparison of AUC across cell lines
 
-2. Calculate correlation coefficients of the AUC in GDSC and CCLE for each drug (hint: code from Tutorial 1b may help). 
+```{r}
+summarizedData %>%
+    ggplot(aes(x = -log10(auc_GDSC), y = -log10(auc_CCLE))) +
+    geom_point(alpha = 1/2, cex = 1/2) + 
+    facet_wrap(~ drug) +
+    xlab("-log10(GDSC AUC)") +
+    ylab("-log10(CCLE AUC)") +
+    ggtitle("AUC summaries of cell line response across studies")
+```
 
-3. Based on the scatterplot and correlation values, would you say that they tend to agree? Why or why not?
+Above we have representations of the various reactions cell Lines have with different drugs using AUC. To quantify these differences, we used Spearman correlations.
 
-4. Does the AUC or IC50 suggest more agreement between the studies? 
+The calculating the correlation coefficients yielded fairly poor results, most of the values were below 0.5. The two drugs with the highest correlation coefficient were PD-0325901 (r = 0.607) and 17-AAG (r = 0.569). This suggests that across the two studies, there isn't particularly strong agreement.
 
-5. Which drug do you think shows the most consistency between the studies? How about the least? 
+```{r}
+## with the tidyverse
+drugCorrs <- summarizedData %>% 
+    group_by(drug) %>%
+    summarize(Spearman_auc = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "spearman"))
 
-6. If you calculated more than one type of correlation coefficient (for example Pearson and Spearman), how do they differ? Which do you think is a better summary of the consistency between the two studies? 
+drugCorrs
+```
 
-7. We have explored Pearson and Spearman correlation, but what about other correlation measures? For example, you could try out distance correlation, which is sensitive to nonlinear relationships. You can find this measure in the `energy` R package, which you'll need to install and load with the following commands:
+#### Comparison of IC50 across cell lines
 
-    ```{r, eval=FALSE}
-    install.packages("energy")
-    load(energy)
-    ```
+```{r}
+summarizedData %>%
+    ggplot(aes(x = -log10(ic50_GDSC), y = -log10(ic50_CCLE))) +
+    geom_point(alpha = 1/2, cex = 1/2) + 
+    facet_wrap(~ drug) +
+    xlab("-log10(GDSC IC50)") +
+    ylab("-log10(CCLE IC50)") +
+    ggtitle("IC50 summaries of cell line response across studies")
+```
 
-    Then, you can compute distance correlation with the `dcor()` function. How does this correlation measure compare to Pearson and Spearman? Do your conclusions about the agreement between the two studies change at all using this measure?
+```{r}
+## with the tidyverse
+drugCorrs <- summarizedData %>% 
+    group_by(drug) %>%
+    summarize(Pearson_ic50  = cor(-log10(ic50_GDSC / 10^6), -log10(ic50_CCLE / 10^6), method = "pearson"))
+drugCorrs
+```
+
+We tried the same process with IC50, hoping to find greater agreement between the studies. However, IC50 correlations performed even worse than AUC's. Notably, some of the same drugs had the high correlation coefficients, PD-0325901 (r = 0.625) had the highest closely followed by 7 Nilotinib (r = 0.611). 17-AAG (r = 0.543), one of the highest in the AUC correlation calculations, had the third highest correlation coefficient in the IC50 calculations. The most consistent drug across both trials was 6 lapatinib, with a coefficient of r = 0.427 in the IC50 calculations vs r = 0.429 in the AUC calculations.
+
+```{r}
+## with the tidyverse
+drugCorrs <- summarizedData %>% 
+    group_by(drug) %>%
+    summarize(Pearson_ic50  = cor(-log10(ic50_GDSC / 10^6), -log10(ic50_CCLE / 10^6), method = "pearson"),
+              Spearman_auc = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "spearman"))
+
+## with the tidyverse
+drugCorrs <- gather(drugCorrs, measure, correlation, -drug)
+
+drugCorrs %>%
+    ggplot(aes(x = drug, y = correlation, fill = measure, group = measure)) +
+    geom_bar(stat = "identity", position = position_dodge(), colour = "black") + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_fill_grey() +
+    ylim(0, 1) + 
+    ggtitle("Correlation of cell line IC50 summaries between studies for each drug")
+```
 
 ### Identifying biological factors that influence replicability of pharmacogenomic studies
 
-1. Are there any cell lines that seem to be consistently resistant? (Hint: look for the 5 cell lines which seem the most resistant in both studies according to the average drug response by AUC; code from Tutorial 2a may help) What effect might this have on your conclusions and interpretations of the agreement between the studies? For example, do you observe any increase in replicability (as measured by correlation of drug response) if you exclude the most resistant cell lines?
+#### Analyzing Resistance and Sensitivity in Cell Lines
+There seem to be some cell lines that seem to be consistently resistant, but the exclusion of these lines wouldn't increase replicability. The graph below shows the greatest correlation between studies of points close to (0,0) on the graph, which when looking at AUC values indicates higher resistance.
 
-2. Classify each cell line as resistant or sensitive to a drug based on its AUC value (Hint: choose a cutoff for which cell lines with AUC below the cutoff are considered resistant and explain your choice of cutoff(s); code from Tutorial 2a may help). Compare the assigned resistance status of cell lines in GDSC and CCLE for each drug. How often do the two studies agree? 
+```{r}
+AUC_study1 <- rbeta(200, 1, 5)
+AUC_study2 <- rbeta(200, 1, 5)
+resistant <- data.frame(AUC_study1, AUC_study2)
 
-3. Compute the Matthews correlation coefficient for sensitivity status (from #2) of cell lines in GDSC and CCLE for each drug (Hint: code from Tutorial 2a may help). Do certain drugs show more or less agreement between studies?
+ggplot(resistant, aes(y = AUC_study2, x = AUC_study1)) +
+    geom_point() +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    ggtitle("Simulated AUC of resistant cell lines")
+```
 
-4. Are there any drugs for which most or all cell lines seem to be resistant in both studies (Hint: code from Tutorial 2a may help)? If so, what are the correlation values for these drugs? What do these results imply about the replicability of these studies?
+The cell lines can be manipulated to show more resistant and more sensitive values. Looking at the graph below, our group determined an appropriate cutoff for resistance would be the vertical and horizontal assymptotes at (0, 25) and (25, 0).
 
-5. Compare the Matthews correlation coefficient values by drug classes defined in Tutorial 2a (No effect, Narrow effect, Broad effect). Which drug class shows the most agreement between the studies? 
+```{r}
+AUC_study1 <- c(rbeta(100, 1, 5), rbeta(100, 4, 2))
+AUC_study2 <- c(rbeta(100, 1, 5), rbeta(100, 4, 2))
+resistant <- data.frame(AUC_study1, AUC_study2, 
+                        CellLine = c(rep("Resistant", 100), rep("Sensitive", 100)))
 
-6. Would you say that the sensitivity results for the two studies tend to agree?
+ggplot(resistant, aes(y = AUC_study2, x = AUC_study1, color = CellLine)) +
+    geom_point() +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    ggtitle("Simulated AUC with half sensitive and half resistant cell lines")
+```
 
-7. For one of the targeted drugs, examine the cell lines that were sensitive in the CCLE and/or GDSC. See if you can find out what types of cells these are by searching the online Cancer Cell Line Encyclopedia http://www.broadinstitute.org/ccle (this will prompt you to register with a username, password, and email address. If you prefer, you can also search the cell line on other websites). See if you can find out what types of cancers this drug is targeted for using the NCI cancer drug database at https://www.cancer.gov/about-cancer/treatment/drugs. Does the list of cell lines found to be sensitive in the two studies agree with this?
+#### Applying Resistance/Sensitivity principles to drugs
+
+Using the principles we explored earlier, we can apply resistance and sensitivity principles to individual drugs, and determine the similarity of findings between the two studies.
+
+```{r}
+summarizedData <- summarizedData %>% 
+              mutate(cutoff = ifelse(drug == "paclitaxel", 0.4, 0.1),
+                     sensitivity_GDSC = factor(ifelse( auc_GDSC < cutoff, "Resistant", "Sensitive")), 
+                     sensitivity_CCLE = factor(ifelse( auc_CCLE < cutoff, "Resistant", "Sensitive"))) 
+
+table("GDSC" = summarizedData$sensitivity_GDSC,
+      "CCLE" = summarizedData$sensitivity_CCLE)
+```
+
+
+```{r}
+summarizedData <-
+    summarizedData %>% 
+    mutate(category = paste(sensitivity_GDSC, sensitivity_CCLE),
+           category = fct_recode(category,
+                                 "Both Resistant" = "Resistant Resistant",
+                                 "Both Sensitive" = "Sensitive Sensitive",
+                                 "GDSC Resistant / CCLE Sensitive" = "Resistant Sensitive",
+                                 "GDSC Sensitive / CCLE Resistant" = "Sensitive Resistant"))
+
+summarizedData %>%
+    subset(drug == "PLX4720") %>%
+    ggplot(aes(x = auc_GDSC, y = auc_CCLE, colour = category)) +
+    geom_point() + 
+    xlab("GDSC AUC") +
+    ylab("CCLE AUC") +
+    geom_hline(aes(yintercept = cutoff), colour="grey", alpha=0.75, lty=2) +
+    geom_vline(aes(xintercept = cutoff), colour="grey", alpha=0.75, lty=2) +
+    ggtitle("Drug PLX4720")
+```
+
+The above graph represents agreement (pink and purple) and contradictory information (green and blue) about resistance and sensitivity to drugs between the two studies. 
+
+```{r}
+ggplot(summarizedData, aes(x = auc_GDSC, y = auc_CCLE, colour = category)) +
+    geom_point(cex = 0.5) + 
+    facet_wrap(~ drug) +
+    xlab("GDSC AUC") +
+    ylab("CCLE AUC") +
+    geom_hline(aes(yintercept = cutoff), colour = "grey", alpha = 0.75, lty = 2) +
+    geom_vline(aes(xintercept = cutoff), colour = "grey", alpha = 0.75, lty = 2) +
+    ggtitle("Cell line sensitivity classifications between studies")
+```
+
+Looking at the collection of scatterplots for individual drugs, there is obviously variation in the overlap of the two studies. Drugs like 17-AAG, Nilotinib, and PD-0325901 (which all, in the previous step, displayed had high correlation coefficient values) appear consist of a majority of pink/purple dots. To quantify the relationship between the studies, we can compute the Matthews correlation coefficient as shown below.
+
+```{r}
+## creation of a Matthews correlation coefficient
+mcc <- function (study1, study2) {
+    BS <- sum(study1 == "Sensitive" & study2 == "Sensitive") 
+    BR <- sum(study1 == "Resistant" & study2 == "Resistant") 
+    SR <- sum(study1 == "Sensitive" & study2 == "Resistant") 
+    RS <- sum(study1 == "Resistant" & study2 == "Sensitive") 
+    
+    if (BS+SR == 0 | BS+RS == 0 | BR+SR == 0 |  BR+RS ==0){
+        mcc <- ((BS*BR)-(SR*RS)) 
+    }else{
+        mcc <- ((BS*BR)-(SR*RS)) / sqrt(exp((log(BS+SR)+log(BS+RS)+log(BR+SR)+log(BR+RS))))
+    }
+    return(mcc)
+}
+
+drugCorrs <- summarizedData %>% 
+    group_by(drug) %>% 
+    summarise(matthews_corr = mcc(sensitivity_GDSC, sensitivity_CCLE))
+drugCorrs
+```
+
+The Matthews Correlation Coefficients calculated indicate low levels of correlation between the two studies, none of the drugs have an r value greater than 0.5. Visually, drugs with higher MCC's appear to contain more pink/purple dots, indicating agreement. 5 Erlotinib (r = 0.432) and 6 lapatinib (r = 0.424) had the highest MCC's.
+
+```{r}
+ggplot(drugCorrs, aes(x = drug, y = matthews_corr)) +
+    geom_bar(stat = "identity") + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Drug") +
+    ylab("Matthews Correlation Coefficient")
+```
+
 
 ### Modeling the relation between two variables (drug concentration vs viability)
 
