@@ -6,7 +6,8 @@ author: Andrea Edwards, Otto Kailing, and Ana Kilgore
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE) # for code turnin
+# knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE) # for presentation
 ```
 
 ## Introduction:
@@ -21,11 +22,8 @@ We began by exploring the raw Pharmaco Data file. In this dataset, there are 288
 
 ```{r}
 library(tidyverse)
-
 ## import data
 pharmacoData <- readRDS(file.path("data", "rawPharmacoData.rds"))
-
-
 ```
 
 ```{r}
@@ -38,23 +36,32 @@ str(pharmacoData)
 We used a histogram to view viability distribution, and compare it with the data descriptions we obtained earlier. Based on the values visible in the first lines of the dataset, the distribution shown by the histogram seems to match that of known viability values. 
 
 ```{r}
-
 # creating histograms for the separate studies
 pharmacoData %>%
   ggplot(aes(x = viability)) +
   geom_histogram(fill = "gray", color = "black") +
   facet_wrap(~ study) +
   ggtitle("Distributions of viability by study") 
-
 range(pharmacoData$viability)
-sum(pharmacoData$viability)
-sum(pharmacoData$viability < 0)
-sum(pharmacoData$viability > 100)
+len <- length(pharmacoData$viability)
+len
+sum(pharmacoData$viability < 0) / len * 100
+sum(pharmacoData$viability > 100) / len * 100
+sum(pharmacoData$viability > 105) / len * 100
+sum(pharmacoData$viability > 110) / len * 100
+sum(pharmacoData$viability > 115) / len * 100
+sum(pharmacoData$viability > 120) / len * 100
+
 ```
 
 However, although the distribution fits, some of the outlying points do not make sense considering the attribute type. The term "viability" refers to the percentage of cells that survive upon drug exposure, so in theory, all viability points should fall within the expected range of 0-100.
 
-According to the above calculations, data points have a range of -20.0 to 319.4919. From a total of 3,826,909 points, only 23 points fall under 0, while 15778 points are above 100. Overall, the outlying points make up only 0.4% of data, and are not statistically significant. This is most likely due to a technical issue.
+<!-- This is wrong, was based on the wrong value. -->
+<!-- According to the above calculations, data points have a range of -20.0 to 319.4919. From a total of 3,826,909 points, only 23 points fall under 0, while 15778 points are above 100. Overall, the outlying points make up only 0.4% of data, and are not statistically significant. This is most likely due to a technical issue. -->
+
+According to the above calculations, data points have a range of -20.0 to 319.4919. From a total of 43427 points, 23 fall under 0, while 15778 points are above 100. Of the outlying points, 0.05% of points have viabilities below zero. This is so few that it's not an issue, and is most likely a technical error. 36.3% of points are over 100. This does not make sense given our understanding of viability. Even accounting for values close to 100, 5.79% of rows have a viability value over 120, which is well out of our expected range.
+
+However, are both of the studies similar? Looking at the histograms again, it appears that the distribution of values over 100 is similar in CCLE and GDSC. So this does not represent a notable difference <em>between the two studies</em>.
 
 #### c. Comparing Variation Distributions
 
@@ -75,7 +82,6 @@ pharmacoData %>%
     geom_density(alpha = 1/4) +
     xlim(0, 170) +
     ggtitle("Distributions of viability scores by dose ID")
-
 ```
 
 This distribution shows viability distributions across dosages 1-9. These distributions are not as consistent, at higher dosages viability becomes less consistent with lower doses. The high dose curves have higher viability at lower levels, and lower viability at higher levels.
@@ -112,7 +118,6 @@ The calculating the correlation coefficients yielded fairly poor results, most o
 drugCorrs <- summarizedData %>% 
     group_by(drug) %>%
     summarize(Spearman_auc = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "spearman"))
-
 drugCorrs
 ```
 
@@ -144,10 +149,8 @@ drugCorrs <- summarizedData %>%
     group_by(drug) %>%
     summarize(Pearson_ic50  = cor(-log10(ic50_GDSC / 10^6), -log10(ic50_CCLE / 10^6), method = "pearson"),
               Spearman_auc = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "spearman"))
-
 ## with the tidyverse
 drugCorrs <- gather(drugCorrs, measure, correlation, -drug)
-
 drugCorrs %>%
     ggplot(aes(x = drug, y = correlation, fill = measure, group = measure)) +
     geom_bar(stat = "identity", position = position_dodge(), colour = "black") + 
@@ -166,7 +169,6 @@ There seem to be some cell lines that seem to be consistently resistant, but the
 AUC_study1 <- rbeta(200, 1, 5)
 AUC_study2 <- rbeta(200, 1, 5)
 resistant <- data.frame(AUC_study1, AUC_study2)
-
 ggplot(resistant, aes(y = AUC_study2, x = AUC_study1)) +
     geom_point() +
     xlim(0, 1) +
@@ -181,7 +183,6 @@ AUC_study1 <- c(rbeta(100, 1, 5), rbeta(100, 4, 2))
 AUC_study2 <- c(rbeta(100, 1, 5), rbeta(100, 4, 2))
 resistant <- data.frame(AUC_study1, AUC_study2, 
                         CellLine = c(rep("Resistant", 100), rep("Sensitive", 100)))
-
 ggplot(resistant, aes(y = AUC_study2, x = AUC_study1, color = CellLine)) +
     geom_point() +
     xlim(0, 1) +
@@ -198,7 +199,6 @@ summarizedData <- summarizedData %>%
               mutate(cutoff = ifelse(drug == "paclitaxel", 0.4, 0.1),
                      sensitivity_GDSC = factor(ifelse( auc_GDSC < cutoff, "Resistant", "Sensitive")), 
                      sensitivity_CCLE = factor(ifelse( auc_CCLE < cutoff, "Resistant", "Sensitive"))) 
-
 table("GDSC" = summarizedData$sensitivity_GDSC,
       "CCLE" = summarizedData$sensitivity_CCLE)
 ```
@@ -213,7 +213,6 @@ summarizedData <-
                                  "Both Sensitive" = "Sensitive Sensitive",
                                  "GDSC Resistant / CCLE Sensitive" = "Resistant Sensitive",
                                  "GDSC Sensitive / CCLE Resistant" = "Sensitive Resistant"))
-
 summarizedData %>%
     subset(drug == "PLX4720") %>%
     ggplot(aes(x = auc_GDSC, y = auc_CCLE, colour = category)) +
@@ -255,7 +254,6 @@ mcc <- function (study1, study2) {
     }
     return(mcc)
 }
-
 drugCorrs <- summarizedData %>% 
     group_by(drug) %>% 
     summarise(matthews_corr = mcc(sensitivity_GDSC, sensitivity_CCLE))
@@ -273,26 +271,12 @@ ggplot(drugCorrs, aes(x = drug, y = matthews_corr)) +
 ```
 
 
-### Modeling the relation between two variables (drug concentration vs viability)
-
-1. Explore the response curves for several drug-cell line combinations. How many drugs-cell line combinations contain viability response values that would potentially enable them to be summarized into an IC50 value? You can answer this, for example, by checking whether there are viability values both above and below 50%.
-
-2. Analyze the model-based re-calculations of IC50 and AUCs from the drug 17-AAG in the H4 cell-line and the drug Nilotinib cell-line in the 22RV1 cell-line. See the figure below and asnwer: which statistic is more roboust, IC50 or AUC? Which statistic is more generalizable, IC50 or AUC? Justify your answer with examples and/or using the whole data recalculations from the *modelSummarizedPharmacoData.rds* file.
-
-```{r, echo = FALSE, out.width = "400px"}
-knitr::include_graphics("figures/reproducible.png")
-```
-
-Modified from [Kirstie Whitaker](https://github.com/KirstieJane/).
-
-3. Are the results more replicable if one uses the same code to calculate IC50 or AUC on the different datasets? Hint: you can use code from Tutorial 2a to evaluate this.
-
-4. Summarize the viability curves of all the drugs in each cell-line using the slope of linear model. Is the slope of the linear regression informative of the drug response? Can we improve the replicability of the studies by using the value of the slope instead of IC50s or AUCs? 
-
 ## Overall Findings:
 
-Summarize your conclusions regarding the level of concordance between the GDSC and CCLE studies. What are the most important considerations for fairly evaluating this question?
+Based on the low values for Spearman correlation between the GDSC and CCLE studies' AUC measurements, there does not seem to be a great deal of concurrence between studies.
 
-Additionally, please prepare a brief (10 minute) presentation of your conclusions and any other aspects of these data sets which you found particularly interesting or challenging.
+We noticed that the cell lines with lower AUC values, aka higher resistance values, had a greater correlation across the two studies. However, even these were not exceptionally correlated. Correlation coefficients were higher when using AUC to compare the studies, rather than IC50. This also signifies that more resistant cell lines would be better to use in further, similar studies.
 
+With regard to the biological factors influencing replicability: AUC values are more correlated (between the studies) the lower they get, which further reinforces our previous observations. 
 
+We chose the low cutoffs for resistance vs. sensitivity that were originally in the tutorial, for consistency and so we could check our points. Plotting sensitivity to each drug shows varied levels between correspondence between studies for each drug, further backing our findings that replicability between the studies is spotty.
